@@ -1,4 +1,4 @@
-from sqlalchemy import insert, URL, create_engine
+from sqlalchemy import insert, URL, create_engine, select
 from sqlalchemy.orm import sessionmaker
 
 from lesson_2 import User
@@ -23,29 +23,33 @@ class Repo:
         print(stmt)
         self.session.execute(stmt)
         self.session.commit()
+    def get_user_by_id(self,telegram_id:int)-> User:
+        stmt = select(User).where(User.telegram_id == telegram_id)
+        result = self.session.execute(stmt)
+        return result.scalar_one_or_none()
 
 
 
+if __name__ == "__main__":
+    from environs import Env
 
-from environs import Env
+    env = Env()
+    env.read_env('.env')
 
-env = Env()
-env.read_env('.env')
-
-url = URL.create(
-    drivername="postgresql+psycopg2",
-    username=env.str("POSTGRES_USER"),
-    password=env.str("POSTGRES_PASSWORD"),
-    host=env.str("POSTGRES_HOST"),
-    port=env.str("POSTGRES_PORT"),
-    database=env.str("POSTGRES_DB"),
-)
-engine = create_engine(url)
-session = sessionmaker(engine)
-with session() as session:
-    repo = Repo(session)
-    repo.add_user(telegram_id=1,
-                  full_name='Jhon Doe',
-                  username='XXXXXX',
-                  language_code="en"
-                  )
+    url = URL.create(
+        drivername="postgresql+psycopg2",
+        username=env.str("POSTGRES_USER"),
+        password=env.str("POSTGRES_PASSWORD"),
+        host=env.str("POSTGRES_HOST"),
+        port=env.str("POSTGRES_PORT"),
+        database=env.str("POSTGRES_DB"),
+    )
+    engine = create_engine(url)
+    session = sessionmaker(engine)
+    with session() as session:
+        repo = Repo(session)
+        repo.add_user(telegram_id=1,
+                      full_name='Jhon Doe',
+                      username='XXXXXX',
+                      language_code="en"
+                      )
