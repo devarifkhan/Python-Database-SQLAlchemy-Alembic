@@ -4,7 +4,7 @@ from typing import Optional
 from sqlalchemy import BIGINT, func, ForeignKey
 from sqlalchemy.dialects.mysql import VARCHAR
 from sqlalchemy.dialects.postgresql import TIMESTAMP
-from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
+from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, declared_attr
 
 
 class Base(DeclarativeBase):
@@ -49,8 +49,21 @@ CREATE TABLE IF NOT EXISTS users
 """
 
 
-class User(Base):
-    __tablename__ = "users"
+class TableNameMixin:
+    @declared_attr.directive
+    def __tablename__(cls):
+        return cls.__name__.lower() + "s"
+
+
+class TimestampMixin:
+    created_at : Mapped[datetime] = mapped_column(
+        TIMESTAMP,nullable=False, server_default=func.now()
+    )
+    updated_at : Mapped[datetime] = mapped_column(
+        TIMESTAMP,nullable=False, server_default=func.now()
+    )
+
+class User(Base,TimestampMixin,TableNameMixin):
     telegram_id: Mapped[int] = mapped_column(
         BIGINT, primary_key=True
     )
@@ -62,11 +75,6 @@ class User(Base):
     )
     language_code: Mapped[str] = mapped_column(
         VARCHAR(255), nullable=False
-    )
-    created_at: Mapped[datetime] = mapped_column(
-        TIMESTAMP,
-        nullable=False,
-        server_default=func.now()
     )
     referrer_id: Mapped[Optional[int]] = mapped_column(
         BIGINT,
