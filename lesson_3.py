@@ -60,4 +60,10 @@ if __name__ == "__main__":
         #               )
         user = repo.get_user_by_id(1)
         print(user)
+        print(
+            f'User:{user.telegram_id} '
+            f'Full name:{user.full_name} '
+            f'Username:{user.username} '
+            f'Language code:{user.language_code}'
+        )
 
