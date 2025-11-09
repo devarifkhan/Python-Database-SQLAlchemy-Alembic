@@ -1,4 +1,4 @@
-from sqlalchemy import insert, URL, create_engine, select
+from sqlalchemy import insert, URL, create_engine, select, or_
 from sqlalchemy.orm import sessionmaker
 
 from lesson_2 import User
@@ -29,10 +29,14 @@ class Repo:
         return result.scalars().first()
 
     def get_all_users(self):
-        stmt = select(User)
+        stmt = select(User).where(or_(User.language_code == 'en' ,User.language_code =="uk"), User.username.ilike("%john%")).order_by(User.created_at.desc()).limit(10).having(User.telegram_id > 0)
         result = self.session.execute(stmt)
         return result.scalars().all()
 
+    def get_user_language(self,telegram_id:int)->str:
+        stmt = select(User.language_code).where(User.telegram_id == telegram_id).order_by(User.created_at.desc())
+        result = self.session.execute(stmt)
+        return result.scalars().first()
 
 
 if __name__ == "__main__":
@@ -53,17 +57,5 @@ if __name__ == "__main__":
     session = sessionmaker(engine)
     with session() as session:
         repo = Repo(session)
-        # repo.add_user(telegram_id=1,
-        #               full_name='Jhon Doe',
-        #               username='XXXXXX',
-        #               language_code="en"
-        #               )
-        user = repo.get_user_by_id(1)
-        print(user)
-        print(
-            f'User:{user.telegram_id} '
-            f'Full name:{user.full_name} '
-            f'Username:{user.username} '
-            f'Language code:{user.language_code}'
-        )
-
+        users = repo.get_all_users()
+        print(users)
