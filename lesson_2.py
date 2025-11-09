@@ -1,7 +1,7 @@
 from typing import Optional, Annotated          # ✅ use typing.Annotated
 from datetime import datetime
 
-from sqlalchemy import BIGINT, Integer, Text, func, ForeignKey, create_engine
+from sqlalchemy import BIGINT, Integer, Text, func, ForeignKey, create_engine, DECIMAL
 from sqlalchemy.dialects.mysql import VARCHAR
 from sqlalchemy.dialects.postgresql import TIMESTAMP
 from sqlalchemy.engine import URL
@@ -32,14 +32,15 @@ class User(Base, TimestampMixin, TableNameMixin):
     telegram_id: Mapped[int] = mapped_column(BIGINT, primary_key=True)
     full_name:   Mapped[str_255]
     username:    Mapped[Optional[str_255]]
-    language_code: Mapped[str_255]
+    language_code: Mapped[str_255] = mapped_column(VARCHAR(10))
     referrer_id: Mapped[Optional[int]] = mapped_column(BIGINT, ForeignKey("users.telegram_id", ondelete="SET NULL"))
     referrer:    Mapped[Optional["User"]] = relationship("User", remote_side=[telegram_id])
 
 class Product(Base, TimestampMixin, TableNameMixin):
     product_id:   Mapped[int_pk]
     title:        Mapped[str_255]
-    description:  Mapped[Optional[str]] = mapped_column(Text)   # real TEXT
+    description:  Mapped[Optional[str]] = mapped_column(VARCHAR(3000))
+    price : Mapped[float] = mapped_column(DECIMAL(16, 4), nullable=False)
 
 class Order(Base, TimestampMixin, TableNameMixin):
     order_id: Mapped[int_pk]
