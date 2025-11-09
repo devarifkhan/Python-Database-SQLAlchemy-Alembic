@@ -26,7 +26,12 @@ class Repo:
     def get_user_by_id(self,telegram_id:int)-> User:
         stmt = select(User).where(User.telegram_id == telegram_id)
         result = self.session.execute(stmt)
-        return result.first()
+        return result.scalars().first()
+
+    def get_all_users(self):
+        stmt = select(User)
+        result = self.session.execute(stmt)
+        return result.scalars().all()
 
 
 
