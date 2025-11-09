@@ -61,5 +61,4 @@ url = URL.create(
     database="testdb",
 )
 engine = create_engine(url, echo=True)
-Base.metadata.drop_all(engine)
-Base.metadata.create_all(engine)
+
