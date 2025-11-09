@@ -71,10 +71,25 @@ def run_migrations_online() -> None:
     and associate a connection with the context.
 
     """
+    from environs import Env
+
+    env = Env()
+    env.read_env('.env')
+
+    url = URL.create(
+        drivername="postgresql+psycopg2",
+        username=env.str("POSTGRES_USER"),
+        password=env.str("POSTGRES_PASSWORD"),
+        host=env.str("POSTGRES_HOST"),
+        port=env.str("POSTGRES_PORT"),
+        database=env.str("POSTGRES_DB"),
+    )
+    
     connectable = engine_from_config(
         config.get_section(config.config_ini_section, {}),
         prefix="sqlalchemy.",
         poolclass=pool.NullPool,
+        url=url,
     )
 
     with connectable.connect() as connection:
