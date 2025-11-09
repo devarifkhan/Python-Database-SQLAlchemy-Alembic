@@ -1,4 +1,5 @@
-from sqlalchemy.orm import DeclarativeBase
+from sqlalchemy import BIGINT
+from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
 
 
 class Base(DeclarativeBase):
@@ -41,3 +42,8 @@ CREATE TABLE IF NOT EXISTS users
     );
 
 """
+class User(Base):
+    __tablename__ = "users"
+    telegram_id : Mapped[int] = mapped_column(
+        BIGINT, primary_key=True
+    )
