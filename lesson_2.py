@@ -1,4 +1,9 @@
-from sqlalchemy import BIGINT
+from argparse import OPTIONAL
+from typing import Optional
+
+from sqlalchemy import BIGINT, func, ForeignKey
+from sqlalchemy.dialects.mysql import VARCHAR
+from sqlalchemy.dialects.postgresql import TIMESTAMP
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
 
 
@@ -42,8 +47,29 @@ CREATE TABLE IF NOT EXISTS users
     );
 
 """
+
+
 class User(Base):
     __tablename__ = "users"
-    telegram_id : Mapped[int] = mapped_column(
+    telegram_id: Mapped[int] = mapped_column(
         BIGINT, primary_key=True
+    )
+    full_name: Mapped[str] = mapped_column(
+        VARCHAR(255)
+    )
+    username: Mapped[Optional[str]] = mapped_column(
+        VARCHAR(255), nullable=True
+    )
+    language_code: Mapped[str] = mapped_column(
+        VARCHAR(255), nullable=False
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        TIMESTAMP,
+        nullable=False,
+        server_default=func.now()
+    )
+    referrer_id: Mapped[Optional[int]] = mapped_column(
+        BIGINT,
+        ForeignKey('users.telegram_id',ondelete='SET NULL'),nullable=True
+
     )
