@@ -26,7 +26,7 @@ class Repo:
     def get_user_by_id(self,telegram_id:int)-> User:
         stmt = select(User).where(User.telegram_id == telegram_id)
         result = self.session.execute(stmt)
-        return result.scalar_one_or_none()
+        return result.first()
 
 
 
@@ -48,8 +48,11 @@ if __name__ == "__main__":
     session = sessionmaker(engine)
     with session() as session:
         repo = Repo(session)
-        repo.add_user(telegram_id=1,
-                      full_name='Jhon Doe',
-                      username='XXXXXX',
-                      language_code="en"
-                      )
+        # repo.add_user(telegram_id=1,
+        #               full_name='Jhon Doe',
+        #               username='XXXXXX',
+        #               language_code="en"
+        #               )
+        user = repo.get_user_by_id(1)
+        print(user)
+
