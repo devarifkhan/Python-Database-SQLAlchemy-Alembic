@@ -35,6 +35,9 @@ class User(Base, TimestampMixin, TableNameMixin):
     language_code: Mapped[str_255] = mapped_column(VARCHAR(10))
     referrer_id: Mapped[Optional[int]] = mapped_column(BIGINT, ForeignKey("users.telegram_id", ondelete="SET NULL"))
     referrer:    Mapped[Optional["User"]] = relationship("User", remote_side=[telegram_id])
+    
+    def __repr__(self):
+        return f"User(id={self.telegram_id}, name='{self.full_name}', username='{self.username}', lang='{self.language_code}')"
 
 class Product(Base, TimestampMixin, TableNameMixin):
     product_id:   Mapped[int_pk]

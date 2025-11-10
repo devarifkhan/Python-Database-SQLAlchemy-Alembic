@@ -65,5 +65,19 @@ if __name__ == "__main__":
     session = sessionmaker(engine)
     with session() as session:
         repo = Repo(session)
+        
+        # Check all users first
+        all_users = session.execute(select(User)).scalars().all()
+        print(f"Total users in database: {len(all_users)}")
+        
+        # Add test user if none exist
+        if not all_users:
+            repo.add_user(1, "John Doe", "johnny", "en")
+            print("Added test user")
+        
         users = repo.get_all_users()
-        print(users)
+        print(f"Filtered users: {users}")
+        
+        # Show all users for comparison
+        all_users = session.execute(select(User)).scalars().all()
+        print(f"All users: {all_users}")
