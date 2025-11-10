@@ -1,7 +1,7 @@
 import random
 
 from faker.proxy import Faker
-from sqlalchemy import insert, URL, create_engine, select, or_, join
+from sqlalchemy import insert, URL, create_engine, select, or_, join, func, desc
 from sqlalchemy.orm import sessionmaker, aliased
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 
@@ -87,6 +87,92 @@ class Repo:
                       ReferralUser.full_name.label('referral_name')).select_from(
             join(ParentUser, ReferralUser, ReferralUser.telegram_id == ParentUser.referrer_id)
         ).where(ParentUser.referrer_id.isnot(None))
+        result = self.session.execute(stmt)
+        return result.all()
+
+    # Advanced Join Queries
+    def get_users_with_orders(self):
+        """Get users with their order count using JOIN"""
+        stmt = select(User.full_name, func.count(Order.order_id).label('order_count')).join(
+            Order, User.telegram_id == Order.user_id
+        ).group_by(User.telegram_id, User.full_name)
+        result = self.session.execute(stmt)
+        return result.all()
+
+    def get_order_details_with_products(self):
+        """Get order details with product information using multiple JOINs"""
+        stmt = select(
+            User.full_name.label('customer_name'),
+            Order.order_id,
+            Product.title.label('product_name'),
+            OrderProduct.quantity,
+            Product.price
+        ).select_from(
+            join(join(join(User, Order, User.telegram_id == Order.user_id), 
+                      OrderProduct, Order.order_id == OrderProduct.order_id),
+                 Product, OrderProduct.product_id == Product.product_id)
+        )
+        result = self.session.execute(stmt)
+        return result.all()
+
+    def get_users_with_referral_count(self):
+        """Get users with count of people they referred using LEFT JOIN"""
+        Referrer = aliased(User)
+        Referred = aliased(User)
+        stmt = select(
+            Referrer.full_name.label('referrer_name'),
+            func.count(Referred.telegram_id).label('referral_count')
+        ).select_from(
+            Referrer.outerjoin(Referred, Referrer.telegram_id == Referred.referrer_id)
+        ).group_by(Referrer.telegram_id, Referrer.full_name)
+        result = self.session.execute(stmt)
+        return result.all()
+
+    # Aggregated Queries
+    def get_total_users_count(self):
+        """Get total number of users"""
+        stmt = select(func.count(User.telegram_id))
+        result = self.session.execute(stmt)
+        return result.scalar()
+
+    def get_average_order_value(self):
+        """Get average order value across all orders"""
+        stmt = select(func.avg(Product.price * OrderProduct.quantity)).select_from(
+            OrderProduct.join(Product)
+        )
+        result = self.session.execute(stmt)
+        return result.scalar()
+
+    def get_top_products_by_quantity(self, limit=5):
+        """Get top products by total quantity ordered"""
+        stmt = select(
+            Product.title,
+            func.sum(OrderProduct.quantity).label('total_quantity')
+        ).join(OrderProduct).group_by(
+            Product.product_id, Product.title
+        ).order_by(desc('total_quantity')).limit(limit)
+        result = self.session.execute(stmt)
+        return result.all()
+
+    def get_user_statistics(self):
+        """Get user statistics by language"""
+        stmt = select(
+            User.language_code,
+            func.count(User.telegram_id).label('user_count'),
+            func.count(Order.order_id).label('total_orders')
+        ).outerjoin(Order).group_by(User.language_code)
+        result = self.session.execute(stmt)
+        return result.all()
+
+    def get_monthly_order_summary(self):
+        """Get monthly order summary with aggregations"""
+        stmt = select(
+            func.date_trunc('month', Order.created_at).label('month'),
+            func.count(Order.order_id).label('order_count'),
+            func.sum(Product.price * OrderProduct.quantity).label('total_revenue')
+        ).select_from(
+            Order.join(OrderProduct).join(Product)
+        ).group_by(func.date_trunc('month', Order.created_at)).order_by('month')
         result = self.session.execute(stmt)
         return result.all()
 
@@ -176,7 +262,57 @@ if __name__ == "__main__":
     with session() as session:
         repo = Repo(session)
         seed_fake_data(repo)
+        
+        # Test referral query
         results = repo.select_all_invited_users()
         print(f"Found {len(results)} users with referrers")
         for row in results:
             print(f"Parent: {row.parent_name}, Referral: {row.referral_name}")
+        
+        print("\n--- Advanced Join Queries ---")
+        
+        # Users with order count
+        users_orders = repo.get_users_with_orders()
+        print(f"\nUsers with orders ({len(users_orders)}):")
+        for row in users_orders:
+            print(f"{row.full_name}: {row.order_count} orders")
+        
+        # Order details with products
+        order_details = repo.get_order_details_with_products()
+        print(f"\nOrder details ({len(order_details)}):")
+        for row in order_details[:5]:  # Show first 5
+            print(f"{row.customer_name} - Order {row.order_id}: {row.quantity}x {row.product_name} (${row.price})")
+        
+        # Users with referral count
+        referral_counts = repo.get_users_with_referral_count()
+        print(f"\nReferral counts ({len(referral_counts)}):")
+        for row in referral_counts:
+            print(f"{row.referrer_name}: {row.referral_count} referrals")
+        
+        print("\n--- Aggregated Queries ---")
+        
+        # Total users
+        total_users = repo.get_total_users_count()
+        print(f"\nTotal users: {total_users}")
+        
+        # Average order value
+        avg_order_value = repo.get_average_order_value()
+        print(f"Average order value: ${avg_order_value:.2f}" if avg_order_value else "No orders")
+        
+        # Top products
+        top_products = repo.get_top_products_by_quantity()
+        print(f"\nTop products by quantity:")
+        for row in top_products:
+            print(f"{row.title}: {row.total_quantity} units")
+        
+        # User statistics by language
+        user_stats = repo.get_user_statistics()
+        print(f"\nUser statistics by language:")
+        for row in user_stats:
+            print(f"{row.language_code}: {row.user_count} users, {row.total_orders} orders")
+        
+        # Monthly order summary
+        monthly_summary = repo.get_monthly_order_summary()
+        print(f"\nMonthly order summary:")
+        for row in monthly_summary:
+            print(f"{row.month.strftime('%Y-%m')}: {row.order_count} orders, ${row.total_revenue:.2f} revenue")
