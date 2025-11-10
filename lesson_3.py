@@ -85,13 +85,11 @@ def seed_fake_data(repo):
     products = []
 
     for _ in range(10):
-        referrer_id = None if not users else users[-1].telegram_id
         user = repo.add_user(
             telegram_id=fake.pyint(),
             full_name=fake.name(),
             username=fake.user_name(),
-            language_code=fake.language_code(),
-            referrer_id=referrer_id
+            language_code=fake.language_code()
         )
         users.append(user)
     for _ in range(10):
@@ -101,12 +99,17 @@ def seed_fake_data(repo):
         orders.append(order)
     for _ in range(10):
         product = repo.add_product(
-            title=fake.catch_phrase(),
-            description=fake.text(),
-            price=fake.pyfloat(left_digits=4, right_digits=2, positive=True)
+            title=fake.word(),
+            description=fake.sentence(),
+            price=fake.pyint()
         )
         products.append(product)
-
+    for _ in range(10):
+        repo.add_product_to_order(
+            order_id=random.choice(orders).order_id,
+            product_id=random.choice(products).product_id,
+            quantity=fake.pyint()
+        )
 
 
 if __name__ == "__main__":
@@ -124,26 +127,7 @@ if __name__ == "__main__":
         database=env.str("POSTGRES_DB"),
     )
     engine = create_engine(url)
-    session = sessionmaker(engine)
+    session = sessionmaker(engine,expire_on_commit=False)
     with session() as session:
         repo = Repo(session)
-        
-        # Check all users first
-        all_users = session.execute(select(User)).scalars().all()
-        print(f"Total users in database: {len(all_users)}")
-        
-        # Add test user if none exist or update existing user
-        if not all_users:
-            repo.add_user(1, "John Doe", "johnny", "en")
-            print("Added test user")
-        else:
-            # Update existing user to match filter criteria
-            repo.add_user(1, "John Doe", "johnny", "en")
-            print("Updated existing user")
-        
-        users = repo.get_all_users()
-        print(f"Filtered users: {users}")
-        
-        # Show all users for comparison
-        all_users = session.execute(select(User)).scalars().all()
-        print(f"All users: {all_users}")
+        seed_fake_data(repo)
