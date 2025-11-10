@@ -31,6 +31,7 @@ class Repo:
         )
         result = self.session.scalars(stmt).first()
         self.session.commit()
+        return result
 
     def get_user_by_id(self, telegram_id: int) -> User:
         stmt = select(User).where(User.telegram_id == telegram_id)
@@ -54,9 +55,9 @@ class Repo:
                user_id=user_id
             ).returning(Order)
         )
-        result = self.session.scalars(stmt)
+        result = self.session.scalars(stmt).first()
         self.session.commit()
-        return result.scalars().first()
+        return result
 
     def add_product(self,title,description,price):
         stmt = select(Product).from_statement(
@@ -64,18 +65,18 @@ class Repo:
                 title=title,description=description,price=price
             ).returning(Product)
         )
-        result = self.session.scalars(stmt)
+        result = self.session.scalars(stmt).first()
         self.session.commit()
-        return result.scalars().first()
+        return result
     def add_product_to_order(self, order_id, product_id, quantity):
         stmt = select(OrderProduct).from_statement(
             insert(OrderProduct).values(
                 order_id=order_id,product_id=product_id,quantity=quantity
             ).returning(OrderProduct)
         )
-        result = self.session.scalars(stmt)
+        result = self.session.scalars(stmt).first()
         self.session.commit()
-        return result.scalars().first()
+        return result
 
 def seed_fake_data(repo):
     Faker.seed(0)
