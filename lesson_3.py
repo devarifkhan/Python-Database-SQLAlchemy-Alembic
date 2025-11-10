@@ -23,7 +23,7 @@ class Repo:
                 language_code=language_code
             ).on_conflict_do_update(
                 index_elements=[User.telegram_id],
-                set=dict(full_name=full_name, username=username)
+                set_=dict(full_name=full_name, username=username)
             ).returning(User)
         )
         result = self.session.scalars(stmt).first()
@@ -70,10 +70,14 @@ if __name__ == "__main__":
         all_users = session.execute(select(User)).scalars().all()
         print(f"Total users in database: {len(all_users)}")
         
-        # Add test user if none exist
+        # Add test user if none exist or update existing user
         if not all_users:
             repo.add_user(1, "John Doe", "johnny", "en")
             print("Added test user")
+        else:
+            # Update existing user to match filter criteria
+            repo.add_user(1, "John Doe", "johnny", "en")
+            print("Updated existing user")
         
         users = repo.get_all_users()
         print(f"Filtered users: {users}")
