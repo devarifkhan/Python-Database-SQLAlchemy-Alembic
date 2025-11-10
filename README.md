@@ -117,8 +117,8 @@ repo.update_order_quantities(order_id, 2.0)  # Double quantities
 # Simple delete
 repo.delete_user_by_id(user_id)
 
-# Range-based delete
-repo.delete_products_by_price_range(10.0, 50.0)
+# Range-based delete with foreign key handling
+repo.delete_products_by_price_range(10.0, 50.0)  # Handles constraints
 
 # Subquery-based delete
 repo.delete_empty_orders()  # Orders without products
@@ -291,6 +291,7 @@ John Doe: $25430.50 (5 orders)
 - **Bulk Operations** - High-performance batch inserts/updates
 - **Upsert Operations** - PostgreSQL ON CONFLICT handling
 - **Transaction Safety** - Proper rollback on errors
+- **Foreign Key Handling** - Safe deletion with constraint management
 
 ### Advanced Patterns
 - **Repository Pattern** - Clean separation of concerns
@@ -310,3 +311,5 @@ John Doe: $25430.50 (5 orders)
 - **Transaction safety** with try/catch blocks
 - **Query optimization** with proper indexing considerations
 - **Code organization** with logical method grouping
+- **Foreign key constraint handling** for safe deletions
+- **Referential integrity** maintenance during operations
