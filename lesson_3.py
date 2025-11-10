@@ -1,5 +1,6 @@
 from sqlalchemy import insert, URL, create_engine, select, or_
 from sqlalchemy.orm import sessionmaker
+from sqlalchemy.dialects.postgresql import insert as pg_insert
 
 from lesson_2 import User
 
@@ -15,15 +16,15 @@ class Repo:
 
     def add_user(self, telegram_id: int, full_name: str, username: str, language_code=None):
         stmt = select(User).from_statement(
-            insert(User).values(
+            pg_insert(User).values(
                 telegram_id=telegram_id,
                 full_name=full_name,
                 username=username,
                 language_code=language_code
-            ).returning(User).on_conflict_do_update(
+            ).on_conflict_do_update(
                 index_elements=[User.telegram_id],
                 set=dict(full_name=full_name, username=username)
-            )
+            ).returning(User)
         )
         result = self.session.scalars(stmt).first()
         self.session.commit()
