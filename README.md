@@ -143,6 +143,54 @@ repo.select_all_invited_users()
 repo.add_product_to_order(order_id, product_id, quantity)
 ```
 
+### 8. Advanced Query Operations
+```python
+# Conditional fields with CASE statements
+repo.get_users_with_conditional_data()  # VIP/Regular/New customer types
+
+# Window functions for rankings and analytics
+repo.get_products_with_window_functions()  # Price rankings, running totals
+
+# EXISTS and subqueries
+repo.get_users_with_subqueries()  # Users with orders or referrals
+
+# Complex filtering with multiple conditions
+repo.get_complex_filtered_data()  # Multi-table filters with HAVING
+```
+
+### 9. Advanced Update Operations
+```python
+# Conditional updates based on subqueries
+repo.conditional_update_users()  # Update to 'premium' based on spending
+
+# Updates using joined table data
+repo.update_with_joins()  # Price adjustments based on order patterns
+```
+
+### 10. Transaction Management
+```python
+# Safe operations with rollback capability
+repo.transfer_order_ownership(from_user_id, to_user_id)
+
+# Batch processing in single transaction
+repo.batch_process_orders(order_updates_list)
+```
+
+### 11. Raw SQL Integration
+```python
+# Execute custom SQL queries
+repo.execute_raw_sql_query("SELECT * FROM users WHERE...")
+
+# Database statistics and analytics
+repo.get_database_statistics()  # Table record counts
+```
+
+### 12. Performance Optimized Queries
+```python
+# Optimized top customers query
+repo.get_top_customers_optimized(limit=10)
+```
+
 ## Key SQLAlchemy Features Demonstrated
 
 ### ORM Patterns
@@ -163,6 +211,11 @@ repo.add_product_to_order(order_id, product_id, quantity)
 - **Bulk operations** for performance
 - **Transaction management** with session commits
 - **Raw SQL integration** when needed
+- **Window functions** (RANK, ROW_NUMBER, running totals)
+- **CASE statements** for conditional logic
+- **EXISTS and subqueries** for complex filtering
+- **Error handling** with rollback mechanisms
+- **Performance optimization** techniques
 
 ## Running the Project
 
@@ -177,7 +230,11 @@ This will:
 3. Demonstrate all query types
 4. Show update/delete operations
 5. Perform bulk operations
-6. Display results for each operation
+6. Execute advanced operations
+7. Display results for each operation
+8. Show performance optimizations
+9. Demonstrate transaction management
+10. Execute raw SQL queries
 
 ## Output Example
 ```
@@ -197,7 +254,49 @@ Updated 1 user language
 
 --- Bulk Operations ---
 Bulk inserted 3 users
+
+--- Advanced Operations ---
+Users with conditional data (10):
+John Doe (en): VIP - $25430.50
+
+Products with rankings (10):
+Premium Product: Rank 1, Price $9999.99
+
+Users with orders/referrals (8):
+Mary Smith: Orders=True, Referrals=True
+
+--- Advanced Updates ---
+Conditionally updated 2 premium users
+
+Database statistics:
+users: 13 records
+orders: 10 records
+products: 13 records
+
+Top customers by spending:
+John Doe: $25430.50 (5 orders)
 ```
+
+## Advanced SQLAlchemy Features Demonstrated
+
+### Query Optimization
+- **Window Functions** - RANK(), ROW_NUMBER(), running totals
+- **Conditional Logic** - CASE statements for dynamic fields
+- **Subqueries & EXISTS** - Complex filtering and existence checks
+- **Multiple JOINs** - 4+ table joins with proper aliasing
+- **Aggregate Functions** - COUNT, SUM, AVG with GROUP BY/HAVING
+
+### Data Manipulation
+- **Conditional Updates** - Updates based on subquery results
+- **Bulk Operations** - High-performance batch inserts/updates
+- **Upsert Operations** - PostgreSQL ON CONFLICT handling
+- **Transaction Safety** - Proper rollback on errors
+
+### Advanced Patterns
+- **Repository Pattern** - Clean separation of concerns
+- **Raw SQL Integration** - When ORM isn't sufficient
+- **Error Handling** - SQLAlchemy exception management
+- **Performance Monitoring** - Query optimization techniques
 
 ## Best Practices Implemented
 
@@ -208,3 +307,6 @@ Bulk inserted 3 users
 - **Environment configuration** for database credentials
 - **Faker integration** for realistic test data
 - **Performance optimization** with bulk operations
+- **Transaction safety** with try/catch blocks
+- **Query optimization** with proper indexing considerations
+- **Code organization** with logical method grouping

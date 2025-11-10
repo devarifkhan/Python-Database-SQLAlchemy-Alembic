@@ -1,8 +1,9 @@
 import random
 
 from faker.proxy import Faker
-from sqlalchemy import insert, URL, create_engine, select, or_, join, func, desc, update, delete
+from sqlalchemy import insert, URL, create_engine, select, or_, join, func, desc, update, delete, and_, case, exists, text
 from sqlalchemy.orm import sessionmaker, aliased
+from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 
 from lesson_2 import User, Order, Product, OrderProduct
@@ -211,14 +212,29 @@ class Repo:
         return result.rowcount
 
     def delete_products_by_price_range(self, min_price: float, max_price: float):
-        """Delete products within price range"""
-        stmt = delete(Product).where(
-            Product.price >= min_price,
-            Product.price <= max_price
-        )
-        result = self.session.execute(stmt)
-        self.session.commit()
-        return result.rowcount
+        """Delete products within price range (handles foreign key constraints)"""
+        try:
+            # First delete related OrderProduct records
+            product_ids_subquery = select(Product.product_id).where(
+                and_(Product.price >= min_price, Product.price <= max_price)
+            )
+            
+            delete_orderproducts = delete(OrderProduct).where(
+                OrderProduct.product_id.in_(product_ids_subquery)
+            )
+            self.session.execute(delete_orderproducts)
+            
+            # Then delete the products
+            stmt = delete(Product).where(
+                and_(Product.price >= min_price, Product.price <= max_price)
+            )
+            result = self.session.execute(stmt)
+            self.session.commit()
+            return result.rowcount
+            
+        except SQLAlchemyError as e:
+            self.session.rollback()
+            raise e
 
     def delete_empty_orders(self):
         """Delete orders with no products"""
@@ -256,6 +272,150 @@ class Repo:
         result = self.session.execute(stmt)
         self.session.commit()
         return result.rowcount
+
+    # Advanced Query Operations
+    def get_users_with_conditional_data(self):
+        """Get users with conditional fields using CASE statements"""
+        stmt = select(
+            User.full_name,
+            User.language_code,
+            case(
+                (func.count(Order.order_id) > 2, 'VIP'),
+                (func.count(Order.order_id) > 0, 'Regular'),
+                else_='New'
+            ).label('customer_type'),
+            func.coalesce(func.sum(Product.price * OrderProduct.quantity), 0).label('total_spent')
+        ).outerjoin(Order).outerjoin(OrderProduct).outerjoin(Product
+        ).group_by(User.telegram_id, User.full_name, User.language_code)
+        result = self.session.execute(stmt)
+        return result.all()
+
+    def get_products_with_window_functions(self):
+        """Get products with ranking and running totals using window functions"""
+        stmt = select(
+            Product.title,
+            Product.price,
+            func.rank().over(order_by=desc(Product.price)).label('price_rank'),
+            func.sum(Product.price).over(order_by=Product.product_id).label('running_total'),
+            func.avg(Product.price).over().label('avg_price')
+        ).order_by(desc(Product.price))
+        result = self.session.execute(stmt)
+        return result.all()
+
+    def get_users_with_subqueries(self):
+        """Get users using EXISTS and subqueries"""
+        has_orders = exists().where(Order.user_id == User.telegram_id)
+        has_referrals = exists().where(User.referrer_id == User.telegram_id)
+        
+        stmt = select(
+            User.full_name,
+            User.language_code,
+            has_orders.label('has_orders'),
+            has_referrals.label('has_referrals')
+        ).where(or_(has_orders, has_referrals))
+        result = self.session.execute(stmt)
+        return result.all()
+
+    def get_complex_filtered_data(self):
+        """Complex filtering with multiple conditions"""
+        stmt = select(
+            User.full_name,
+            func.count(Order.order_id).label('order_count'),
+            func.sum(Product.price * OrderProduct.quantity).label('total_value')
+        ).join(Order).join(OrderProduct).join(Product).where(
+            and_(
+                User.language_code.in_(['en', 'fr', 'es']),
+                Product.price > 1000,
+                OrderProduct.quantity >= 2
+            )
+        ).group_by(User.telegram_id, User.full_name).having(
+            func.count(Order.order_id) > 1
+        )
+        result = self.session.execute(stmt)
+        return result.all()
+
+    # Advanced Update Operations
+    def conditional_update_users(self):
+        """Update users based on complex conditions"""
+        subquery = select(Order.user_id).join(OrderProduct).join(Product).group_by(
+            Order.user_id
+        ).having(func.sum(Product.price * OrderProduct.quantity) > 10000)
+        
+        stmt = update(User).where(
+            User.telegram_id.in_(subquery)
+        ).values(language_code='premium')
+        
+        result = self.session.execute(stmt)
+        self.session.commit()
+        return result.rowcount
+
+    # Transaction Management
+    def transfer_order_ownership(self, from_user_id: int, to_user_id: int):
+        """Transfer all orders from one user to another with transaction"""
+        try:
+            from_user = self.session.execute(
+                select(User).where(User.telegram_id == from_user_id)
+            ).scalar_one_or_none()
+            
+            to_user = self.session.execute(
+                select(User).where(User.telegram_id == to_user_id)
+            ).scalar_one_or_none()
+            
+            if not from_user or not to_user:
+                raise ValueError("One or both users not found")
+            
+            stmt = update(Order).where(
+                Order.user_id == from_user_id
+            ).values(user_id=to_user_id)
+            
+            result = self.session.execute(stmt)
+            self.session.commit()
+            return result.rowcount
+            
+        except SQLAlchemyError as e:
+            self.session.rollback()
+            raise e
+
+    # Raw SQL Operations
+    def execute_raw_sql_query(self, sql_query: str):
+        """Execute raw SQL for complex operations"""
+        result = self.session.execute(text(sql_query))
+        return result.fetchall()
+
+    def get_database_statistics(self):
+        """Get database statistics using raw SQL"""
+        stats_query = """
+        SELECT 
+            'users' as table_name, COUNT(*) as record_count 
+        FROM users
+        UNION ALL
+        SELECT 
+            'orders' as table_name, COUNT(*) as record_count 
+        FROM orders
+        UNION ALL
+        SELECT 
+            'products' as table_name, COUNT(*) as record_count 
+        FROM products
+        UNION ALL
+        SELECT 
+            'orderproducts' as table_name, COUNT(*) as record_count 
+        FROM orderproducts
+        """
+        return self.execute_raw_sql_query(stats_query)
+
+    def get_top_customers_optimized(self, limit: int = 10):
+        """Optimized query for top customers by order value"""
+        stmt = select(
+            User.full_name,
+            User.telegram_id,
+            func.sum(Product.price * OrderProduct.quantity).label('total_spent'),
+            func.count(func.distinct(Order.order_id)).label('order_count')
+        ).join(Order).join(OrderProduct).join(Product
+        ).group_by(User.telegram_id, User.full_name
+        ).order_by(desc('total_spent')).limit(limit)
+        
+        result = self.session.execute(stmt)
+        return result.all()
 
 
 def seed_fake_data(repo):
@@ -458,3 +618,47 @@ if __name__ == "__main__":
         # Clean up - delete a test user
         deleted_count = repo.delete_user_by_id(3001)
         print(f"Deleted {deleted_count} test user")
+        
+        print("\n--- Advanced Operations ---")
+        
+        # Conditional data with CASE statements
+        conditional_data = repo.get_users_with_conditional_data()
+        print(f"\nUsers with conditional data ({len(conditional_data)}):")
+        for row in conditional_data[:3]:
+            print(f"{row.full_name} ({row.language_code}): {row.customer_type} - ${row.total_spent:.2f}")
+        
+        # Window functions
+        window_data = repo.get_products_with_window_functions()
+        print(f"\nProducts with rankings ({len(window_data)}):")
+        for row in window_data[:3]:
+            print(f"{row.title}: Rank {row.price_rank}, Price ${row.price:.2f}")
+        
+        # Subqueries and EXISTS
+        subquery_data = repo.get_users_with_subqueries()
+        print(f"\nUsers with orders/referrals ({len(subquery_data)}):")
+        for row in subquery_data[:3]:
+            print(f"{row.full_name}: Orders={row.has_orders}, Referrals={row.has_referrals}")
+        
+        # Complex filtering
+        complex_data = repo.get_complex_filtered_data()
+        print(f"\nComplex filtered data ({len(complex_data)}):")
+        for row in complex_data:
+            print(f"{row.full_name}: {row.order_count} orders, ${row.total_value:.2f}")
+        
+        print("\n--- Advanced Updates ---")
+        
+        # Conditional updates
+        updated_count = repo.conditional_update_users()
+        print(f"Conditionally updated {updated_count} premium users")
+        
+        # Database statistics
+        db_stats = repo.get_database_statistics()
+        print(f"\nDatabase statistics:")
+        for stat in db_stats:
+            print(f"{stat[0]}: {stat[1]} records")
+        
+        # Top customers
+        top_customers = repo.get_top_customers_optimized(5)
+        print(f"\nTop customers by spending:")
+        for customer in top_customers:
+            print(f"{customer.full_name}: ${customer.total_spent:.2f} ({customer.order_count} orders)")
