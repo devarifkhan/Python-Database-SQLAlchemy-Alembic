@@ -70,8 +70,11 @@ class Repo:
         return result
     def add_product_to_order(self, order_id, product_id, quantity):
         stmt = select(OrderProduct).from_statement(
-            insert(OrderProduct).values(
+            pg_insert(OrderProduct).values(
                 order_id=order_id,product_id=product_id,quantity=quantity
+            ).on_conflict_do_update(
+                index_elements=[OrderProduct.order_id, OrderProduct.product_id],
+                set_=dict(quantity=quantity)
             ).returning(OrderProduct)
         )
         result = self.session.scalars(stmt).first()
@@ -131,4 +134,6 @@ if __name__ == "__main__":
     session = sessionmaker(engine,expire_on_commit=False)
     with session() as session:
         repo = Repo(session)
+        print("Seeding fake data...")
         seed_fake_data(repo)
+        print("Data seeded successfully!")
