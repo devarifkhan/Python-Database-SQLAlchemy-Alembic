@@ -1,7 +1,7 @@
 import random
 
 from faker.proxy import Faker
-from sqlalchemy import insert, URL, create_engine, select, or_, join, func, desc
+from sqlalchemy import insert, URL, create_engine, select, or_, join, func, desc, update, delete
 from sqlalchemy.orm import sessionmaker, aliased
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 
@@ -178,6 +178,85 @@ class Repo:
         result = self.session.execute(stmt)
         return result.all()
 
+    # Update Queries with ORM
+    def update_user_language(self, telegram_id: int, new_language: str):
+        """Update user language by telegram_id"""
+        stmt = update(User).where(User.telegram_id == telegram_id).values(language_code=new_language)
+        result = self.session.execute(stmt)
+        self.session.commit()
+        return result.rowcount
+
+    def update_product_price(self, product_id: int, new_price: float):
+        """Update product price"""
+        stmt = update(Product).where(Product.product_id == product_id).values(price=new_price)
+        result = self.session.execute(stmt)
+        self.session.commit()
+        return result.rowcount
+
+    def update_order_quantities(self, order_id: int, quantity_multiplier: float):
+        """Update all product quantities in an order"""
+        stmt = update(OrderProduct).where(
+            OrderProduct.order_id == order_id
+        ).values(quantity=OrderProduct.quantity * quantity_multiplier)
+        result = self.session.execute(stmt)
+        self.session.commit()
+        return result.rowcount
+
+    # Delete Queries with ORM
+    def delete_user_by_id(self, telegram_id: int):
+        """Delete user by telegram_id"""
+        stmt = delete(User).where(User.telegram_id == telegram_id)
+        result = self.session.execute(stmt)
+        self.session.commit()
+        return result.rowcount
+
+    def delete_products_by_price_range(self, min_price: float, max_price: float):
+        """Delete products within price range"""
+        stmt = delete(Product).where(
+            Product.price >= min_price,
+            Product.price <= max_price
+        )
+        result = self.session.execute(stmt)
+        self.session.commit()
+        return result.rowcount
+
+    def delete_empty_orders(self):
+        """Delete orders with no products"""
+        subquery = select(OrderProduct.order_id).distinct()
+        stmt = delete(Order).where(~Order.order_id.in_(subquery))
+        result = self.session.execute(stmt)
+        self.session.commit()
+        return result.rowcount
+
+    # Bulk Insert Operations with ORM
+    def bulk_insert_users(self, users_data: list):
+        """Bulk insert multiple users"""
+        stmt = insert(User).values(users_data)
+        result = self.session.execute(stmt)
+        self.session.commit()
+        return result.rowcount
+
+    def bulk_insert_products(self, products_data: list):
+        """Bulk insert multiple products"""
+        stmt = insert(Product).values(products_data)
+        result = self.session.execute(stmt)
+        self.session.commit()
+        return result.rowcount
+
+    def bulk_upsert_users(self, users_data: list):
+        """Bulk upsert users (insert or update on conflict)"""
+        stmt = pg_insert(User).values(users_data).on_conflict_do_update(
+            index_elements=[User.telegram_id],
+            set_=dict(
+                full_name=pg_insert(User).excluded.full_name,
+                username=pg_insert(User).excluded.username,
+                language_code=pg_insert(User).excluded.language_code
+            )
+        )
+        result = self.session.execute(stmt)
+        self.session.commit()
+        return result.rowcount
+
 
 def seed_fake_data(repo):
     # Clear existing data
@@ -243,6 +322,8 @@ def seed_fake_data(repo):
             product_id=random.choice(products).product_id,
             quantity=fake.pyint(min_value=1, max_value=5)
         )
+    
+    return users, orders, products
 
 
 if __name__ == "__main__":
@@ -263,7 +344,7 @@ if __name__ == "__main__":
     session = sessionmaker(engine,expire_on_commit=False)
     with session() as session:
         repo = Repo(session)
-        seed_fake_data(repo)
+        users, orders, products = seed_fake_data(repo)
         
         # Test referral query
         results = repo.select_all_invited_users()
@@ -318,3 +399,62 @@ if __name__ == "__main__":
         print(f"\nMonthly order summary:")
         for row in monthly_summary:
             print(f"{row.month.strftime('%Y-%m')}: {row.order_count} orders, ${row.total_revenue:.2f} revenue")
+        
+        print("\n--- Update Operations ---")
+        
+        # Update user language
+        updated_count = repo.update_user_language(1000, 'en')
+        print(f"Updated {updated_count} user language")
+        
+        # Update product price
+        if products:
+            updated_count = repo.update_product_price(products[0].product_id, 99.99)
+            print(f"Updated {updated_count} product price")
+        
+        # Update order quantities
+        if orders:
+            updated_count = repo.update_order_quantities(orders[0].order_id, 2.0)
+            print(f"Updated {updated_count} order quantities")
+        
+        print("\n--- Delete Operations ---")
+        
+        # Delete products by price range
+        deleted_count = repo.delete_products_by_price_range(0, 1000)
+        print(f"Deleted {deleted_count} products in price range")
+        
+        # Delete empty orders
+        deleted_count = repo.delete_empty_orders()
+        print(f"Deleted {deleted_count} empty orders")
+        
+        print("\n--- Bulk Operations ---")
+        
+        # Bulk insert users
+        bulk_users = [
+            {'telegram_id': 3001, 'full_name': 'Bulk User 1', 'username': 'bulk1', 'language_code': 'en'},
+            {'telegram_id': 3002, 'full_name': 'Bulk User 2', 'username': 'bulk2', 'language_code': 'es'},
+            {'telegram_id': 3003, 'full_name': 'Bulk User 3', 'username': 'bulk3', 'language_code': 'fr'}
+        ]
+        inserted_count = repo.bulk_insert_users(bulk_users)
+        print(f"Bulk inserted {inserted_count} users")
+        
+        # Bulk insert products
+        bulk_products = [
+            {'title': 'Bulk Product 1', 'description': 'Description 1', 'price': 19.99},
+            {'title': 'Bulk Product 2', 'description': 'Description 2', 'price': 29.99},
+            {'title': 'Bulk Product 3', 'description': 'Description 3', 'price': 39.99}
+        ]
+        inserted_count = repo.bulk_insert_products(bulk_products)
+        print(f"Bulk inserted {inserted_count} products")
+        
+        # Bulk upsert users (update existing)
+        bulk_users[0]['full_name'] = 'Updated Bulk User 1'
+        upserted_count = repo.bulk_upsert_users(bulk_users)
+        print(f"Bulk upserted {upserted_count} users")
+        
+        # Final counts
+        final_user_count = repo.get_total_users_count()
+        print(f"\nFinal user count: {final_user_count}")
+        
+        # Clean up - delete a test user
+        deleted_count = repo.delete_user_by_id(3001)
+        print(f"Deleted {deleted_count} test user")
