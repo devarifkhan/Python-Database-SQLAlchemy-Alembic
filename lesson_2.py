@@ -35,7 +35,8 @@ class User(Base, TimestampMixin, TableNameMixin):
     language_code: Mapped[str_255] = mapped_column(VARCHAR(10))
     referrer_id: Mapped[Optional[int]] = mapped_column(BIGINT, ForeignKey("users.telegram_id", ondelete="SET NULL"))
     referrer:    Mapped[Optional["User"]] = relationship("User", remote_side=[telegram_id])
-    
+    orders:      Mapped[list["Order"]] = relationship(back_populates='user')
+
     def __repr__(self):
         return f"User(id={self.telegram_id}, name='{self.full_name}', username='{self.username}', lang='{self.language_code}')"
 
@@ -48,12 +49,14 @@ class Product(Base, TimestampMixin, TableNameMixin):
 class Order(Base, TimestampMixin, TableNameMixin):
     order_id: Mapped[int_pk]
     user_id:  Mapped[user_fk_cascade]
-    user:     Mapped["User"] = relationship("User", passive_deletes=True)
+    products: Mapped[list["OrderProduct"]] = relationship("OrderProduct", cascade="all, delete-orphan", passive_deletes=True)
+    user:     Mapped["User"] = relationship(back_populates='orders')
 
 class OrderProduct(Base, TableNameMixin):
     order_id:   Mapped[int] = mapped_column(Integer, ForeignKey("orders.order_id", ondelete="CASCADE"), primary_key=True)
     product_id: Mapped[int] = mapped_column(Integer, ForeignKey("products.product_id", ondelete="RESTRICT"), primary_key=True)
     quantity:   Mapped[int]
+    product:    Mapped["Product"] = relationship("Product", passive_deletes=True)
 
 # ---------- Engine / DDL ----------
 url = URL.create(

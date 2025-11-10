@@ -1,8 +1,8 @@
 import random
 
 from faker.proxy import Faker
-from sqlalchemy import insert, URL, create_engine, select, or_
-from sqlalchemy.orm import sessionmaker
+from sqlalchemy import insert, URL, create_engine, select, or_, join
+from sqlalchemy.orm import sessionmaker, aliased
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 
 from lesson_2 import User, Order, Product, OrderProduct
@@ -80,22 +80,63 @@ class Repo:
         result = self.session.scalars(stmt).first()
         self.session.commit()
         return result
+    def select_all_invited_users(self):
+        ParentUser = aliased(User)
+        ReferralUser = aliased(User)
+        stmt = select(ParentUser.full_name.label('parent_name'),
+                      ReferralUser.full_name.label('referral_name')).select_from(
+            join(ParentUser, ReferralUser, ReferralUser.telegram_id == ParentUser.referrer_id)
+        ).where(ParentUser.referrer_id.isnot(None))
+        result = self.session.execute(stmt)
+        return result.all()
+
 
 def seed_fake_data(repo):
+    # Clear existing data
+    from sqlalchemy import text
+    repo.session.execute(text('TRUNCATE TABLE users CASCADE'))
+    repo.session.commit()
+    
     Faker.seed(0)
     fake = Faker()
     users = []
     orders = []
     products = []
-
-    for _ in range(10):
+    
+    # Generate unique telegram_ids
+    used_ids = set()
+    
+    # Create initial users without referrers
+    for i in range(5):
+        telegram_id = 1000 + i  # Use sequential IDs to avoid duplicates
         user = repo.add_user(
-            telegram_id=fake.pyint(),
+            telegram_id=telegram_id,
             full_name=fake.name(),
             username=fake.user_name(),
             language_code=fake.language_code()
         )
         users.append(user)
+        used_ids.add(telegram_id)
+    
+    # Create users with referrers
+    for i in range(5):
+        telegram_id = 2000 + i  # Use different range for referred users
+        referrer = random.choice(users)
+        user_data = {
+            'telegram_id': telegram_id,
+            'full_name': fake.name(),
+            'username': fake.user_name(),
+            'language_code': fake.language_code(),
+            'referrer_id': referrer.telegram_id
+        }
+        # Insert user with referrer using raw insert
+        from sqlalchemy import insert
+        stmt = insert(User).values(**user_data).returning(User)
+        result = repo.session.execute(stmt)
+        user = result.scalars().first()
+        repo.session.commit()
+        users.append(user)
+        used_ids.add(telegram_id)
     for _ in range(10):
         order = repo.add_order(
             user_id=random.choice(users).telegram_id
@@ -134,6 +175,8 @@ if __name__ == "__main__":
     session = sessionmaker(engine,expire_on_commit=False)
     with session() as session:
         repo = Repo(session)
-        print("Seeding fake data...")
         seed_fake_data(repo)
-        print("Data seeded successfully!")
+        results = repo.select_all_invited_users()
+        print(f"Found {len(results)} users with referrers")
+        for row in results:
+            print(f"Parent: {row.parent_name}, Referral: {row.referral_name}")
