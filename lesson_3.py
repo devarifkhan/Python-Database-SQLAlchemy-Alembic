@@ -1,9 +1,11 @@
+import random
+
 from faker.proxy import Faker
 from sqlalchemy import insert, URL, create_engine, select, or_
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 
-from lesson_2 import User
+from lesson_2 import User, Order, Product, OrderProduct
 
 """
 INSERT INTO users(telegram_id, full_name, username, language_code, created_at)
@@ -46,7 +48,34 @@ class Repo:
         stmt = select(User.language_code).where(User.telegram_id == telegram_id).order_by(User.created_at.desc())
         result = self.session.execute(stmt)
         return result.scalars().first()
+    def add_order(self,user_id:int):
+        stmt = select(Order).from_statement(
+            insert(Order).values(
+               user_id=user_id
+            ).returning(Order)
+        )
+        result = self.session.scalars(stmt)
+        self.session.commit()
+        return result.scalars().first()
 
+    def add_product(self,title,description,price):
+        stmt = select(Product).from_statement(
+            insert(Product).values(
+                title=title,description=description,price=price
+            ).returning(Product)
+        )
+        result = self.session.scalars(stmt)
+        self.session.commit()
+        return result.scalars().first()
+    def add_product_to_order(self, order_id, product_id, quantity):
+        stmt = select(OrderProduct).from_statement(
+            insert(OrderProduct).values(
+                order_id=order_id,product_id=product_id,quantity=quantity
+            ).returning(OrderProduct)
+        )
+        result = self.session.scalars(stmt)
+        self.session.commit()
+        return result.scalars().first()
 
 def seed_fake_data(repo):
     Faker.seed(0)
@@ -65,6 +94,18 @@ def seed_fake_data(repo):
             referrer_id=referrer_id
         )
         users.append(user)
+    for _ in range(10):
+        order = repo.add_order(
+            user_id=random.choice(users).telegram_id
+        )
+        orders.append(order)
+    for _ in range(10):
+        product = repo.add_product(
+            title=fake.catch_phrase(),
+            description=fake.text(),
+            price=fake.pyfloat(left_digits=4, right_digits=2, positive=True)
+        )
+        products.append(product)
 
 
 
