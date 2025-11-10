@@ -123,7 +123,8 @@ class Repo:
             Referrer.full_name.label('referrer_name'),
             func.count(Referred.telegram_id).label('referral_count')
         ).select_from(
-            Referrer.outerjoin(Referred, Referrer.telegram_id == Referred.referrer_id)
+            Referrer
+        ).outerjoin(Referred, Referrer.telegram_id == Referred.referrer_id
         ).group_by(Referrer.telegram_id, Referrer.full_name)
         result = self.session.execute(stmt)
         return result.all()
@@ -138,7 +139,7 @@ class Repo:
     def get_average_order_value(self):
         """Get average order value across all orders"""
         stmt = select(func.avg(Product.price * OrderProduct.quantity)).select_from(
-            OrderProduct.join(Product)
+            join(OrderProduct, Product, OrderProduct.product_id == Product.product_id)
         )
         result = self.session.execute(stmt)
         return result.scalar()
@@ -171,7 +172,8 @@ class Repo:
             func.count(Order.order_id).label('order_count'),
             func.sum(Product.price * OrderProduct.quantity).label('total_revenue')
         ).select_from(
-            Order.join(OrderProduct).join(Product)
+            join(join(Order, OrderProduct, Order.order_id == OrderProduct.order_id),
+                 Product, OrderProduct.product_id == Product.product_id)
         ).group_by(func.date_trunc('month', Order.created_at)).order_by('month')
         result = self.session.execute(stmt)
         return result.all()
@@ -239,7 +241,7 @@ def seed_fake_data(repo):
         repo.add_product_to_order(
             order_id=random.choice(orders).order_id,
             product_id=random.choice(products).product_id,
-            quantity=fake.pyint()
+            quantity=fake.pyint(min_value=1, max_value=5)
         )
 
 
