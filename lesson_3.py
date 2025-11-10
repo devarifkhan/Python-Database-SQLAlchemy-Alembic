@@ -1,3 +1,4 @@
+from faker.proxy import Faker
 from sqlalchemy import insert, URL, create_engine, select, or_
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.dialects.postgresql import insert as pg_insert
@@ -45,6 +46,26 @@ class Repo:
         stmt = select(User.language_code).where(User.telegram_id == telegram_id).order_by(User.created_at.desc())
         result = self.session.execute(stmt)
         return result.scalars().first()
+
+
+def seed_fake_data(repo):
+    Faker.seed(0)
+    fake = Faker()
+    users = []
+    orders = []
+    products = []
+
+    for _ in range(10):
+        referrer_id = None if not users else users[-1].telegram_id
+        user = repo.add_user(
+            telegram_id=fake.pyint(),
+            full_name=fake.name(),
+            username=fake.user_name(),
+            language_code=fake.language_code(),
+            referrer_id=referrer_id
+        )
+        users.append(user)
+
 
 
 if __name__ == "__main__":
